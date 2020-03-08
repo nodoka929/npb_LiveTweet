@@ -1,5 +1,7 @@
 # npb_LiveTweet
 
+ハッシュタグで日本のプロ野球12球団の実況ツイートを取得します。
+
 詳細はQiitaにも記載しています。
 https://qiita.com/non-caffeine/items/a297a8b72f16308b69a0
 

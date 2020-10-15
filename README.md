@@ -2,9 +2,6 @@
 
 ハッシュタグで日本のプロ野球12球団の実況ツイートを取得します。
 
-詳細はQiitaにも記載しています。
-https://qiita.com/non-caffeine/items/a297a8b72f16308b69a0
-
 # 実況ツイート取得の概要
 
 ### 1. 対象の日の対戦カード・試合の時刻を取得
@@ -58,7 +55,6 @@ SPORTS BULL（https://sportsbull.jp/stats/npb/）
 スポナビから取得しても良いが，こちらの方がHTMLの構造が簡単。
 
 ```python:getLiveTweet_NPB.py
-
 def get_gameteamId(gamedate):
     url = 'https://sportsbull.jp/stats/npb/home/index/' + gamedate
     print(url)
@@ -69,11 +65,13 @@ def get_gameteamId(gamedate):
     flag_list = [1 for i in range(12)]
     i = 0
     for p in q:
+        # print(p)
         urls = p.get('href')
-        # 中止になったときの処理
+        # print(urls)
         p_ = p.select('.st-03')
+        #print(p_)
         for p__ in p_:
-            if '中止' in str(p__.text):
+            if '中止' in str(p__.text) or 'ノーゲーム' in str(p__.text):
                 print('中止')
                 flag_list[i] = 0
                 flag_list[i+1] = 0
@@ -84,23 +82,25 @@ def get_gameteamId(gamedate):
     print('flag_list: ',flag_list)
     q = soup.select('.game-block .play-box01 dt')
     teamId_list = []
-    teamId_dict = {'巨人': 0, '中日': 1, '広島': 2, 'ヤクルト': 3, '阪神': 4, 'ＤｅＮＡ': 5,
+    # 研究共通
+    teamId_dic = {'巨人': 0, '中日': 1, '広島': 2, 'ヤクルト': 3, '阪神': 4, 'ＤｅＮＡ': 5,
                   '日本ハム': 6, 'ソフトバンク': 7, '楽天': 8, '西武': 9, 'ロッテ': 10, 'オリックス': 11}
     i = 0
     for p in q:
+        print(p.text)
         if flag_list[i] == 1:
-            teamId_list.append(teamId_dict[p.text])
+            teamId_list.append(teamId_dic[p.text])
         i += 1
     return gameId_list, teamId_list
 
 
 #日付
 def get_date(days_ago):
-	date = datetime.date.today()
-	date -= datetime.timedelta(days=days_ago)
-	date_str = str(date)
-	date_str = date_str[:4]+date_str[5:7]+date_str[8:10]
-	return date_str
+    date = datetime.date.today()
+    date -= datetime.timedelta(days=days_ago)
+    date_str = str(date)
+    date_str = date_str[:4]+date_str[5:7]+date_str[8:10]
+    return date_str
 
 
 # 例 --------------------------
@@ -141,31 +141,32 @@ https://baseball.yahoo.co.jp/npb/game/[game_id]/top
 から開始時間と試合時間がとれるため，足し算して開始時間と終了時間を取得する
 
 ```python:getLiveTweet_NPB.py
-
 # 試合の開始時間と終了時間をスクレイピングで取得
 def gametime(game_id):
     url = 'https://baseball.yahoo.co.jp/npb/game/' + game_id + '/top'
+    print(url)
     res = req.urlopen(url)
     soup = BeautifulSoup(res, 'html.parser')
     time = []
 
     # 開始時間
-    css_select = '#gm_match .gamecard .column-center .stadium'
+    css_select = '#contentMain .bb-gameDescription time'
     q = soup.select(css_select)
-    time.append(q[0].text[-6:-4])
-    time.append(q[0].text[-3:-1])
+    print(q[0].text)
+    time.append(q[0].text[-5:-3])
+    time.append(q[0].text[-2:])
 
     # 終了時間
     minutes = []
-    while True:
-        try:
-            css_select = '#yjSNLiveDetaildata td'
-            q = soup.select(css_select)
-            minutes = q[1].text.split('時間')
-            minutes[1] = minutes[1][:-1]
-            break
-        except:
-            continue
+    css_select = '.bb-tableLeft .bb-tableLeft__data'
+    q = soup.select(css_select)
+    for q_ in q:
+        # print(q_.text)
+        if '時間' in q_.text:
+            minutes = q_.text.split('時間')
+    minutes[1] = minutes[1][:-1]
+    print(minutes)
+
     time = time + minutes
     return time
 ```
@@ -248,12 +249,14 @@ def get_livetweet(team_id, game_id):
         eh += 1
     eh = '{0:02d}'.format(eh)
     em = '{0:02d}'.format(em)
-    
+
     print(date, sh, sm, eh, em)
-    tag_list = {0: '#kyojin OR #giants', 1: '#dragons',\
-            2: '#carp', 3: '#swallows OR #yakultswallows',4: '#hanshin OR #tigers',\
-            5: '#baystars', 6: '#lovefighters', 7: '#sbhawks',8: '#rakuteneagles',\
-            9: '#seibulions', 10: '#chibalotte', 11: '#Orix_Buffaloes'}
+    tag_list = {0: '#kyojin OR #giants', 1: '#dragons OR #中日ドラゴンズ',\
+            2: '#carp OR #広島カープ', 3: '#swallows OR #ヤクルトスワローズ',\
+            4: '#hanshin OR #阪神タイガース', 5: '#baystars OR #ベイスターズ',\
+            6: '#lovefighters OR #日ハム ', 7: '#sbhawks OR #ホークス',\
+            8: '#rakuteneagles OR #楽天イーグルス', 9: '#seibulions OR #西武ライオンズ',\
+            10: '#chibalotte OR #千葉ロッテマリーンズ', 11: '#bs2020 OR #バファローズ'}
     tag = tag_list[team_num]
     query = tag + ' exclude:retweets exclude:replies\
             since:' + date + '_' + sh + ':' + sm + ':00_JST \
@@ -265,7 +268,6 @@ def get_livetweet(team_id, game_id):
 上で作られた gameId_list，teamId_list  から，一つの試合ごとに２つのチームのツイートを取得する
 
 ```python:getLiveTweet_NPB.py
-
 for i in range(len(gameId_list)):
     game_id = gameId_list[i]
 
